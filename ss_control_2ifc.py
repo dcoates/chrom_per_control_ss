@@ -28,7 +28,7 @@ stair_init_value = 0.9
 # 200 pix on projector is 140 on the external screen
 dimensions.min_pix = 1.19 / (200/140.0)
 
-size_deg = 2/60.0   #diameter
+size_deg = 10/60.0   #diameter
 stim_size = (1/dimensions.min_pix) * 60 * size_deg     # invert minutes/pix = pixels/min, *60 = pixels/deg * 1.0 deg = TOTAL PIXELS
 num_ecc = 1     # total number of rings (ecc tested)
 deg_ecc = 2.5     # degree steps for each ring (ecc)
@@ -39,11 +39,12 @@ print( size_deg, stim_size, dimensions.min_pix)
 stim_dur = 0.30
 nontarget_dur_min = 0.2
 nontarget_dur_max = 0.4
-resp_timeout_seconds=3.0
+resp_timeout_seconds=30.0
 
 do_instructions=True
 do_countdown=False
 do_eye_tracker=False
+do_fixation=True
 do_fixation_first=True
 do_fixation_after=False
 do_pport=False
@@ -180,6 +181,8 @@ if do_sound:
     corr_tone = sound.Sound('B', secs=0.2, volume=vol)
     incorr_tone = sound.Sound('C', secs=0.2, volume=vol)
     done_tone = sound.Sound('D', secs=0.2, volume=vol)
+    i1_tone = sound.Sound('A', secs=0.2, volume=vol)
+    i2_tone = sound.Sound('D', secs=0.2, volume=vol)
 
 # all circles
 circs = []
@@ -216,11 +219,11 @@ conditions = []
 for i in np.arange(len(target_circs)):
     if i==0:
         pos='1'
-        key='9'
+        key='1'
         joystick_button=0
     else:
         pos='2'
-        key='1'
+        key='2'
         joystick_button=1
 
     # full stairs
@@ -298,9 +301,19 @@ if do_countdown:
 trial_counter = 0
 ##
 ## main exp loop
+
+TIME_BEFORE_I1 = 1.000
+STIM_DURATION = 0.300
+TIME_BETWEEN = 1.000
+NOISE_AFTER = 1.000 # Prevent offset difference cue
+
+trial_counter = 0
+##
+## main exp loop
 for curr_val, curr_cond in stairs:
     trial_counter += 1
     curr_pos = curr_cond['coord']
+    curr_index = int(curr_cond['label'])
     trialClock = core.Clock() # trialClock start at zero for each trial
 
     now = ptb.GetSecs()
@@ -344,42 +357,68 @@ for curr_val, curr_cond in stairs:
         timeCurr = trialClock.getTime()
         shader.set_time(timeCurr) # send time to shader (for randomizing noise)
         bg.draw()
-        fix.draw()
-        for circ in circs: # For each circle (target and non-targets).
 
-            circ.draw()
-            
-            if timeCurr >= circ.lifespan: # Time to die?
+        #fix.draw()
+        #if do_fixation:
+            #fix_vert.draw()
+            #fix_hori.draw()
+        #fix_buff.draw()
+        circ = circs[-1]
 
-                # if its correct position and correct time, become target
-                if np.array_equal(np.round(circ.pos),np.round(curr_pos)) and circ.num_deaths==5:
-                    stairs.addOtherData('time_stim',time.time())
-                    if do_pport:
-                        pport.write_data_register(0); # Set it low on this frame (will be cleared next frame)
-                        
-                    # Make it colored.
-                    if exp_params['color_dir'] == 0:
-                        circ.setColor((-1.0, curr_val, -1.0), 'rgb')
-                    else:
-                        circ.setColor(((curr_val*2.0)-1.0, 0.5, -1.0), 'rgb')
-                        
-                    circ.lifespan = timeCurr + stim_dur
-                    #resp_timeout_seconds += circ.lifespan
-                    
-                    circ.num_deaths +=1 # Increment death counter for both targets and nontargets
-                    is_stim_on = True
-                    allow_resp = True
+        if timeCurr < TIME_BEFORE_I1:
+            #print("S1",end='')
+            circ.setColor((-1.0, noi_col(), -1.0), 'rgb')
+        elif timeCurr <= TIME_BEFORE_I1+STIM_DURATION:
+            i1_tone.play(when=now)
+            #print("S2",end='')
+            # Int1
+            stairs.addOtherData('time_stim',time.time())
+            if do_pport:
+                pport.write_data_register(0); # Set it low on this frame (will be cleared next frame)
 
+            # Make it colored.
+            if curr_index == 0: 
+                circ.setColor(((curr_val*2.0)-1.0, 0, -1.0), 'rgb')
+            else:
+                circ.setColor((-1.0, noi_col(), -1.0), 'rgb')
+                #circ.setColor((-1.0, curr_val, -1.0), 'rgb')
 
-                else: # Nontarget. Or target becoming nontarget.
-                    # (noise) if age is up, give it new color, +deaths
-                    circ.setColor((-1.0, noi_col(), -1.0), 'rgb')
-                    circ.lifespan = rand_range_float(nontarget_dur_min,nontarget_dur_max) + timeCurr
-                    circ.num_deaths +=1 # Increment death counter for both targets and nontargets
+            is_stim_on = True
+            allow_resp = True
+        elif timeCurr <= TIME_BEFORE_I1+STIM_DURATION+TIME_BETWEEN:
+            print("S3",end='')
+            # (noise) if age is up, give it new color, +deaths
+            circ.setColor((-1.0, noi_col(), -1.0), 'rgb')
+            circ.lifespan = rand_range_float(nontarget_dur_min,nontarget_dur_max) + timeCurr
+            circ.num_deaths +=1 # Increment death counter for both targets and nontargets
 
-                    if np.array_equal(np.round(circ.pos),np.round(curr_pos)):
-                        is_stim_on = False # Target turned off
+            is_stim_on = False # Target turned off
+        elif timeCurr <= TIME_BEFORE_I1+STIM_DURATION+TIME_BETWEEN+STIM_DURATION:
+            i2_tone.play(when=now)
+            #print("S4",end='')
+            # Int2
+            stairs.addOtherData('time_stim',time.time())
+            if do_pport:
+                pport.write_data_register(0); # Set it low on this frame (will be cleared next frame)
 
+            # Make it colored.
+            if curr_index==1:
+                circ.setColor(((curr_val*2.0)-1.0, 0, -1.0), 'rgb')
+            else:
+                circ.setColor((-1.0, noi_col(), -1.0), 'rgb')
+                #circ.setColor((-1.0, curr_val, -1.0), 'rgb')
+
+            is_stim_on = True
+            allow_resp = True
+        elif timeCurr <= TIME_BEFORE_I1+STIM_DURATION+TIME_BETWEEN+STIM_DURATION:
+            #print("S5",end='')
+            circ.setColor((-1.0, noi_col(), -1.0), 'rgb')
+        else:
+            # After:
+            #print("S5",end='')
+            circ.setColor((-1.0, -1.0, -1.0), 'rgb')
+
+        circ.draw()
         win.flip()
 
         if allow_resp:
