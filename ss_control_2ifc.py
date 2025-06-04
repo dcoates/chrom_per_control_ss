@@ -41,6 +41,12 @@ nontarget_dur_min = 0.2
 nontarget_dur_max = 0.4
 resp_timeout_seconds=30.0
 
+# 2 IFC parameters:
+TIME_BEFORE_I1 = 1.000
+STIM_DURATION = 0.300
+TIME_BETWEEN = 1.000
+NOISE_AFTER = 1.000 # Prevent offset cue
+
 do_instructions=True
 do_countdown=False
 do_eye_tracker=False
@@ -302,10 +308,6 @@ trial_counter = 0
 ##
 ## main exp loop
 
-TIME_BEFORE_I1 = 1.000
-STIM_DURATION = 0.300
-TIME_BETWEEN = 1.000
-NOISE_AFTER = 1.000 # Prevent offset difference cue
 
 trial_counter = 0
 ##
@@ -410,7 +412,7 @@ for curr_val, curr_cond in stairs:
 
             is_stim_on = True
             allow_resp = True
-        elif timeCurr <= TIME_BEFORE_I1+STIM_DURATION+TIME_BETWEEN+STIM_DURATION:
+        elif timeCurr <= TIME_BEFORE_I1+STIM_DURATION+TIME_BETWEEN+STIM_DURATION+NOISE_AFTER:
             #print("S5",end='')
             circ.setColor((-1.0, noi_col(), -1.0), 'rgb')
         else:
@@ -590,7 +592,7 @@ stairs.saveAsExcel(file_name)
 
 if do_sound:
     now = ptb.GetSecs()
-    if do_sounds:
+    if do_sound:
         done_tone.play(when=now)
 
 ##
